@@ -26,6 +26,9 @@
   <!-- Fondo de lluvia binaria -->
   <canvas class="rain" id="rain" aria-hidden="true"></canvas>
 
+  <!-- Barra de progreso de lectura -->
+  <div class="scrollbar" id="scrollBar" aria-hidden="true"></div>
+
   <div class="app">
 
     <!-- ========== HEADER ========== -->
@@ -38,10 +41,13 @@
         <span>CiberShield <b>Lab</b></span>
       </a>
 
-      <div class="status">
-        <span class="status__dot" aria-hidden="true"></span>
-        <span class="status__text">Sistema protegido</span>
-        <span class="status__clock" id="clock" aria-label="Hora actual">00:00:00</span>
+      <div class="topbar__right">
+        <div class="status">
+          <span class="status__dot" aria-hidden="true"></span>
+          <span class="status__text">Sistema protegido</span>
+          <span class="status__clock" id="clock" aria-label="Hora actual">00:00:00</span>
+        </div>
+        <button class="theme-btn" id="themeBtn" type="button" aria-label="Cambiar a modo claro">☀️</button>
       </div>
     </header>
 
@@ -49,16 +55,17 @@
 
       <!-- ========== HERO ========== -->
       <section class="hero">
-        <p class="hero__tag">&gt; laboratorio_seguridad.exe</p>
+        <p class="hero__tag"><span id="typeTag" data-text="&gt; laboratorio_seguridad.exe">&gt; laboratorio_seguridad.exe</span><span class="cursor" aria-hidden="true">_</span></p>
         <h1 class="hero__title">Aprende a defenderte <span class="grad">como un profesional</span>.</h1>
         <p class="hero__lead">
-          Seis herramientas interactivas para analizar contraseñas, generar claves seguras, calcular hashes, codificar mensajes y entrenar tu ojo contra el phishing.
+          Nueve herramientas interactivas y tres guías para analizar contraseñas, revisar enlaces, calcular hashes, entrenar tu ojo contra el phishing y entender cómo funcionan los ataques.
         </p>
 
         <ul class="hero__stats">
-          <li><strong>6</strong> herramientas</li>
+          <li><strong data-count="9">9</strong> herramientas</li>
+          <li><strong data-count="3">3</strong> guías</li>
           <li><strong>100%</strong> local en tu navegador</li>
-          <li><strong>0</strong> datos enviados</li>
+          <li><strong data-count="0">0</strong> datos enviados</li>
         </ul>
 
         <div class="tip">
@@ -69,13 +76,27 @@
       </section>
 
       <!-- ========== PESTAÑAS ========== -->
-      <div class="tabs" role="tablist" aria-label="Herramientas de ciberseguridad">
+      <div class="modes" role="group" aria-label="Sección de la página">
+        <button class="mode is-active" type="button" data-mode="tools" aria-pressed="true">🛠️ Herramientas</button>
+        <button class="mode" type="button" data-mode="learn" aria-pressed="false">📚 Aprende</button>
+      </div>
+
+      <div class="tabs" role="tablist" aria-label="Herramientas de ciberseguridad" data-group="tools">
         <button class="tab is-active" role="tab" id="tab-pass" aria-controls="panel-pass" aria-selected="true" data-tab="pass">🔑 Contraseña</button>
         <button class="tab" role="tab" id="tab-gen" aria-controls="panel-gen" aria-selected="false" tabindex="-1" data-tab="gen">⚙️ Generador</button>
+        <button class="tab" role="tab" id="tab-pin" aria-controls="panel-pin" aria-selected="false" tabindex="-1" data-tab="pin">🔢 PIN y frases</button>
         <button class="tab" role="tab" id="tab-hash" aria-controls="panel-hash" aria-selected="false" tabindex="-1" data-tab="hash">#️⃣ Hash</button>
         <button class="tab" role="tab" id="tab-enc" aria-controls="panel-enc" aria-selected="false" tabindex="-1" data-tab="enc">🔐 Codificador</button>
+        <button class="tab" role="tab" id="tab-link" aria-controls="panel-link" aria-selected="false" tabindex="-1" data-tab="link">🔗 Enlaces</button>
+        <button class="tab" role="tab" id="tab-leak" aria-controls="panel-leak" aria-selected="false" tabindex="-1" data-tab="leak">🕵️ Filtraciones</button>
         <button class="tab" role="tab" id="tab-quiz" aria-controls="panel-quiz" aria-selected="false" tabindex="-1" data-tab="quiz">🎣 Phishing</button>
         <button class="tab" role="tab" id="tab-term" aria-controls="panel-term" aria-selected="false" tabindex="-1" data-tab="term">💻 Terminal</button>
+      </div>
+
+      <div class="tabs" role="tablist" aria-label="Guías para aprender" data-group="learn" hidden>
+        <button class="tab is-active" role="tab" id="tab-gloss" aria-controls="panel-gloss" aria-selected="true" data-tab="gloss">📖 Glosario</button>
+        <button class="tab" role="tab" id="tab-attacks" aria-controls="panel-attacks" aria-selected="false" tabindex="-1" data-tab="attacks">⚔️ Tipos de ataques</button>
+        <button class="tab" role="tab" id="tab-best" aria-controls="panel-best" aria-selected="false" tabindex="-1" data-tab="best">✅ Buenas prácticas</button>
       </div>
 
       <!-- ========== PANEL: ANALIZADOR ========== -->
@@ -281,10 +302,148 @@
         </div>
       </section>
 
+      <!-- ========== PANEL: PIN Y FRASES ========== -->
+      <section class="panel" role="tabpanel" id="panel-pin" aria-labelledby="tab-pin" hidden>
+        <h2 class="panel__title">PIN seguro y frases de contraseña</h2>
+        <p class="panel__hint">Generados con el aleatorio criptográfico del navegador.</p>
+
+        <h3 class="subtitle">PIN numérico</h3>
+        <div class="field">
+          <label for="pinLength">Cantidad de dígitos</label>
+          <select class="input" id="pinLength">
+            <option value="4">4 dígitos</option>
+            <option value="6" selected>6 dígitos</option>
+            <option value="8">8 dígitos</option>
+          </select>
+        </div>
+        <div class="field__row">
+          <input class="input input--mono input--big" id="pinOutput" type="text" readonly aria-label="PIN generado">
+          <button class="btn" id="pinCopy" type="button">Copiar</button>
+        </div>
+        <p class="note" id="pinInfo"></p>
+        <button class="btn btn--ghost" id="pinRegen" type="button">Generar otro PIN</button>
+
+        <hr class="sep">
+
+        <h3 class="subtitle">Frase de contraseña</h3>
+        <p class="panel__hint">Varias palabras al azar son largas, fáciles de recordar y difíciles de adivinar.</p>
+        <div class="field">
+          <label for="phraseWords">Palabras: <strong id="phraseWordsVal">5</strong></label>
+          <input class="range" id="phraseWords" type="range" min="3" max="8" value="5">
+        </div>
+        <div class="field">
+          <label for="phraseSep">Separador</label>
+          <select class="input" id="phraseSep">
+            <option value="-">Guion ( - )</option>
+            <option value=" ">Espacio</option>
+            <option value=".">Punto ( . )</option>
+            <option value="">Ninguno</option>
+          </select>
+        </div>
+        <div class="options">
+          <label class="check"><input type="checkbox" id="phraseCap" checked><span>Primera letra en mayúscula</span></label>
+          <label class="check"><input type="checkbox" id="phraseNum" checked><span>Añadir un número al final</span></label>
+        </div>
+        <div class="field__row">
+          <input class="input input--mono input--big" id="phraseOutput" type="text" readonly aria-label="Frase generada">
+          <button class="btn" id="phraseCopy" type="button">Copiar</button>
+        </div>
+        <p class="note" id="phraseInfo"></p>
+        <button class="btn btn--ghost" id="phraseRegen" type="button">Generar otra frase</button>
+      </section>
+
+      <!-- ========== PANEL: VERIFICADOR DE ENLACES ========== -->
+      <section class="panel" role="tabpanel" id="panel-link" aria-labelledby="tab-link" hidden>
+        <h2 class="panel__title">Verificador de enlaces</h2>
+        <p class="panel__hint">Pega un enlace sospechoso y revisa sus señales de alerta. El análisis es local: nunca abre ni visita la dirección.</p>
+
+        <div class="field">
+          <label for="linkInput">Enlace a revisar</label>
+          <div class="field__row">
+            <input class="input input--mono" id="linkInput" type="text" inputmode="url" autocomplete="off" spellcheck="false" placeholder="https://...">
+            <button class="btn" id="linkCheck" type="button">Analizar</button>
+          </div>
+        </div>
+        <div class="btn-row">
+          <button class="btn btn--ghost" id="linkExample" type="button">Probar un ejemplo</button>
+        </div>
+
+        <div class="linkres" id="linkResult" aria-live="polite" hidden></div>
+      </section>
+
+      <!-- ========== PANEL: FILTRACIONES (SIMULADO) ========== -->
+      <section class="panel" role="tabpanel" id="panel-leak" aria-labelledby="tab-leak" hidden>
+        <h2 class="panel__title">Detector de filtraciones <span class="badge-sim">simulado</span></h2>
+        <p class="panel__hint">Demostración educativa: los resultados son ficticios y se generan en tu dispositivo, sin enviar tu correo a ningún lado. Para una revisión real usa <a class="link" href="https://haveibeenpwned.com" target="_blank" rel="noopener noreferrer">Have I Been Pwned</a>.</p>
+
+        <div class="field">
+          <label for="leakEmail">Correo electrónico</label>
+          <div class="field__row">
+            <input class="input input--mono" id="leakEmail" type="text" inputmode="email" autocomplete="off" spellcheck="false" placeholder="tu@correo.com">
+            <button class="btn" id="leakBtn" type="button">Consultar</button>
+          </div>
+        </div>
+
+        <div class="scan" id="leakScan" hidden>
+          <div class="radar" aria-hidden="true"></div>
+          <p class="scan__text" id="leakScanText" role="status"></p>
+        </div>
+
+        <div id="leakResult" aria-live="polite" hidden></div>
+      </section>
+
+      <!-- ========== PANEL: GLOSARIO ========== -->
+      <section class="panel" role="tabpanel" id="panel-gloss" aria-labelledby="tab-gloss" hidden>
+        <h2 class="panel__title">Glosario de ciberseguridad</h2>
+        <p class="panel__hint">Los términos que más vas a escuchar, explicados sin tecnicismos.</p>
+
+        <div class="field">
+          <label for="glossSearch">Buscar término</label>
+          <input class="input" id="glossSearch" type="search" autocomplete="off" placeholder="Ej: ransomware">
+        </div>
+        <p class="counter" id="glossCount" aria-live="polite"></p>
+        <div class="gloss" id="glossList"></div>
+        <p class="note" id="glossEmpty" hidden>No encontré ese término. Prueba con otra palabra.</p>
+      </section>
+
+      <!-- ========== PANEL: TIPOS DE ATAQUES ========== -->
+      <section class="panel" role="tabpanel" id="panel-attacks" aria-labelledby="tab-attacks" hidden>
+        <h2 class="panel__title">Tipos de ataques</h2>
+        <p class="panel__hint">Cómo funcionan a grandes rasgos y, sobre todo, cómo defenderte. Toca una tarjeta para ver más.</p>
+
+        <div class="chips" role="group" aria-label="Filtrar por objetivo">
+          <button class="chip is-active" type="button" data-target="todos">Todos</button>
+          <button class="chip" type="button" data-target="personas">Personas</button>
+          <button class="chip" type="button" data-target="webs">Sitios web</button>
+          <button class="chip" type="button" data-target="redes">Redes</button>
+        </div>
+
+        <div class="attacks" id="attackList"></div>
+      </section>
+
+      <!-- ========== PANEL: BUENAS PRÁCTICAS ========== -->
+      <section class="panel" role="tabpanel" id="panel-best" aria-labelledby="tab-best" hidden>
+        <h2 class="panel__title">Guía de buenas prácticas</h2>
+        <p class="panel__hint">Marca lo que ya haces y descubre tu nivel de higiene digital. Tu progreso se guarda en este navegador.</p>
+
+        <div class="score">
+          <div class="score__ring" id="bestRing" style="--p: 0">
+            <div class="score__inner"><span id="bestPct">0%</span></div>
+          </div>
+          <div class="score__info">
+            <p class="score__label" id="bestLabel">Principiante</p>
+            <p class="score__count" id="bestCount">0 de 0 hábitos</p>
+            <button class="mini-btn" id="bestReset" type="button">Reiniciar</button>
+          </div>
+        </div>
+
+        <div id="bestList"></div>
+      </section>
+
     </main>
 
     <footer class="footer">
-      <p>CiberShield Lab · Proyecto educativo. Todo se procesa en tu navegador y no se guarda ningún dato.</p>
+      <p>CiberShield Lab · Proyecto educativo. Todo se procesa en tu navegador. Solo se guardan localmente tu tema y tu lista de buenas prácticas.</p>
     </footer>
   </div>
 
@@ -292,4 +451,4 @@
 
   <script src="script.js"></script>
 </body>
-</html>
+          </html>
