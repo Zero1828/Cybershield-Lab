@@ -95,21 +95,26 @@
     else requestAnimationFrame(frame);
   }
 
-  /* ---------- Fondo: lluvia binaria suave ---------- */
+  /* ---------- Fondo: lluvia binaria suave (se adapta al tema) ---------- */
   function startRain() {
     if (reduceMotion) return;
 
     const canvas = $("rain");
     const ctx = canvas.getContext("2d");
     const fontSize = 16;
-    let w, h, cols, drops;
+    let w, h, cols, drops, bg, blue, green;
 
     function setup() {
+      const light = document.documentElement.getAttribute("data-theme") === "light";
+      bg = getComputedStyle(document.documentElement).getPropertyValue("--bg-rgb").trim() || "5, 7, 13";
+      blue = light ? "#1f6feb" : "#2f8bff";
+      green = light ? "#00a870" : "#00f5a0";
+
       w = canvas.width = window.innerWidth;
       h = canvas.height = window.innerHeight;
       cols = Math.floor(w / fontSize);
       drops = Array.from({ length: cols }, () => Math.random() * -40);
-      ctx.fillStyle = "#05070d";
+      ctx.fillStyle = `rgb(${bg})`;
       ctx.fillRect(0, 0, w, h);
     }
 
@@ -122,12 +127,12 @@
       if (t - last < 55) return; // limita los cuadros por segundo
       last = t;
 
-      ctx.fillStyle = "rgba(5, 7, 13, 0.14)";
+      ctx.fillStyle = `rgba(${bg}, 0.14)`;
       ctx.fillRect(0, 0, w, h);
       ctx.font = `${fontSize}px monospace`;
 
       for (let i = 0; i < cols; i++) {
-        ctx.fillStyle = i % 2 ? "#2f8bff" : "#00f5a0";
+        ctx.fillStyle = i % 2 ? blue : green;
         ctx.fillText(Math.random() < 0.5 ? "0" : "1", i * fontSize, drops[i] * fontSize);
         if (drops[i] * fontSize > h && Math.random() > 0.975) drops[i] = 0;
         drops[i]++;
@@ -217,38 +222,69 @@
   }
 
   /* ==========================================================
-     3. PESTAÑAS
+     3. PESTAÑAS (Herramientas / Aprende)
      ========================================================== */
   function initTabs() {
-    const tabs = Array.from(document.querySelectorAll(".tab"));
+    const groups = {};
+    document.querySelectorAll(".tabs").forEach((list) => {
+      const tabs = Array.from(list.querySelectorAll(".tab"));
+      groups[list.dataset.group] = { list, tabs, active: tabs[0] };
+    });
+    const modeButtons = Array.from(document.querySelectorAll(".mode"));
+    let mode = "tools";
+
+    function render() {
+      Object.entries(groups).forEach(([name, g]) => {
+        g.list.hidden = name !== mode;
+        g.tabs.forEach((t) => {
+          const isActive = t === g.active;
+          t.classList.toggle("is-active", isActive);
+          t.setAttribute("aria-selected", String(isActive));
+          t.tabIndex = isActive ? 0 : -1;
+          $(t.getAttribute("aria-controls")).hidden = !(name === mode && isActive);
+        });
+      });
+      modeButtons.forEach((b) => {
+        const on = b.dataset.mode === mode;
+        b.classList.toggle("is-active", on);
+        b.setAttribute("aria-pressed", String(on));
+      });
+    }
 
     function select(tab, focus) {
-      tabs.forEach((t) => {
-        const active = t === tab;
-        t.classList.toggle("is-active", active);
-        t.setAttribute("aria-selected", String(active));
-        t.tabIndex = active ? 0 : -1;
-        $(t.getAttribute("aria-controls")).hidden = !active;
-      });
+      const g = groups[tab.closest(".tabs").dataset.group];
+      g.active = tab;
+      render();
       if (focus) tab.focus();
       tab.scrollIntoView({ block: "nearest", inline: "center", behavior: reduceMotion ? "auto" : "smooth" });
       if (tab.dataset.tab === "term") $("termInput").focus({ preventScroll: true });
     }
 
-    tabs.forEach((tab, i) => {
-      tab.addEventListener("click", () => select(tab, false));
-      tab.addEventListener("keydown", (e) => {
-        let next = null;
-        if (e.key === "ArrowRight") next = tabs[(i + 1) % tabs.length];
-        if (e.key === "ArrowLeft") next = tabs[(i - 1 + tabs.length) % tabs.length];
-        if (e.key === "Home") next = tabs[0];
-        if (e.key === "End") next = tabs[tabs.length - 1];
-        if (next) {
-          e.preventDefault();
-          select(next, true);
-        }
+    Object.values(groups).forEach((g) => {
+      g.tabs.forEach((tab, i) => {
+        tab.addEventListener("click", () => select(tab, false));
+        tab.addEventListener("keydown", (e) => {
+          let next = null;
+          if (e.key === "ArrowRight") next = g.tabs[(i + 1) % g.tabs.length];
+          if (e.key === "ArrowLeft") next = g.tabs[(i - 1 + g.tabs.length) % g.tabs.length];
+          if (e.key === "Home") next = g.tabs[0];
+          if (e.key === "End") next = g.tabs[g.tabs.length - 1];
+          if (next) {
+            e.preventDefault();
+            select(next, true);
+          }
+        });
       });
     });
+
+    modeButtons.forEach((btn) => {
+      btn.addEventListener("click", () => {
+        mode = btn.dataset.mode;
+        render();
+      });
+    });
+
+    render();
   }
 
   /* ==========================================================
@@ -916,18 +952,744 @@
   }
 
   /* ==========================================================
+     NUEVAS FUNCIONES: utilidades
+     ========================================================== */
+  const h = (tag, cls, text) => {
+    const el = document.createElement(tag);
+    if (cls) el.className = cls;
+    if (text !== undefined) el.textContent = text;
+    return el;
+  };
+
+  const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+  const plain = (s) => s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+
+  function fnv(str) {
+    let x = 2166136261;
+    for (let i = 0; i < str.length; i++) {
+      x ^= str.charCodeAt(i);
+      x = Math.imul(x, 16777619);
+    }
+    return x >>> 0;
+  }
+
+  function storageGet(key) {
+    try {
+      return localStorage.getItem(key);
+    } catch (e) {
+      return null;
+    }
+  }
+
+  function storageSet(key, value) {
+    try {
+      localStorage.setItem(key, value);
+    } catch (e) {
+      /* almacenamiento no disponible: se ignora */
+    }
+  }
+
+  /* ==========================================================
+     TEMA CLARO / OSCURO
+     ========================================================== */
+  function initTheme() {
+    const btn = $("themeBtn");
+    let theme = storageGet("cibershield-theme") === "light" ? "light" : "dark";
+
+    function apply() {
+      document.documentElement.setAttribute("data-theme", theme);
+      btn.textContent = theme === "light" ? "🌙" : "☀️";
+      btn.setAttribute("aria-label", theme === "light" ? "Cambiar a modo oscuro" : "Cambiar a modo claro");
+    }
+
+    btn.addEventListener("click", () => {
+      theme = theme === "light" ? "dark" : "light";
+      apply();
+      storageSet("cibershield-theme", theme);
+      window.dispatchEvent(new Event("resize")); // la lluvia se recalcula con los nuevos colores
+    });
+
+    apply();
+  }
+
+  /* ==========================================================
+     EFECTOS VISUALES
+     ========================================================== */
+  function typeTag() {
+    const el = $("typeTag");
+    if (reduceMotion) return;
+    const text = el.dataset.text;
+    el.textContent = "";
+    let i = 0;
+    const id = setInterval(() => {
+      el.textContent = text.slice(0, ++i);
+      if (i >= text.length) clearInterval(id);
+    }, 55);
+  }
+
+  function countUp() {
+    document.querySelectorAll("[data-count]").forEach((el) => {
+      const target = Number(el.dataset.count);
+      if (reduceMotion || !target) {
+        el.textContent = target;
+        return;
+      }
+      let start = null;
+      const step = (t) => {
+        if (start === null) start = t;
+        const p = Math.min((t - start) / 900, 1);
+        el.textContent = Math.round(target * p);
+        if (p < 1) requestAnimationFrame(step);
+      };
+      requestAnimationFrame(step);
+    });
+  }
+
+  function initEffects() {
+    // Barra de progreso de lectura
+    const bar = $("scrollBar");
+    const updateBar = () => {
+      const max = document.documentElement.scrollHeight - window.innerHeight;
+      bar.style.transform = `scaleX(${max > 0 ? window.scrollY / max : 0})`;
+    };
+    window.addEventListener("scroll", updateBar, { passive: true });
+    window.addEventListener("resize", updateBar);
+    updateBar();
+
+    // Foco de luz que sigue al cursor dentro de los paneles
+    document.querySelectorAll(".panel").forEach((panel) => {
+      panel.addEventListener("pointermove", (e) => {
+        const r = panel.getBoundingClientRect();
+        panel.style.setProperty("--mx", `${e.clientX - r.left}px`);
+        panel.style.setProperty("--my", `${e.clientY - r.top}px`);
+      });
+    });
+  }
+
+  /* ==========================================================
+     VERIFICADOR DE ENLACES
+     ========================================================== */
+  function initLinkChecker() {
+    const input = $("linkInput");
+    const out = $("linkResult");
+
+    const SHORTENERS = ["bit.ly", "tinyurl.com", "t.co", "goo.gl", "is.gd", "cutt.ly", "ow.ly", "rebrand.ly", "shorturl.at", "tiny.cc"];
+    const RISKY_TLDS = ["xyz", "top", "click", "zip", "mov", "tk", "gq", "cf", "ml", "ga", "work", "loan", "icu", "buzz", "rest"];
+    const KEYWORDS = ["login", "signin", "verify", "verifica", "secure", "seguro", "account", "cuenta", "update", "actualiza", "banco", "bank", "pago", "payment", "wallet", "password", "clave", "soporte", "support"];
+    const EXAMPLES = [
+      "http://banconova-verifica.xyz/login",
+      "https://www.wikipedia.org",
+      "http://192.168.4.20/pago",
+      "https://bit.ly/3xK9envio",
+      "https://soporte.cuenta-segura.premio-gratis.com/verifica",
+    ];
+    let exampleIndex = 0;
+
+    function registrable(host) {
+      const parts = host.split(".");
+      if (parts.length <= 2) return host;
+      const last = parts[parts.length - 1];
+      const second = parts[parts.length - 2];
+      if (last.length === 2 && ["co", "com", "org", "net", "gov", "edu", "ac"].includes(second)) {
+        return parts.slice(-3).join(".");
+      }
+      return parts.slice(-2).join(".");
+    }
+
+    function analyze(raw) {
+      const text = raw.trim();
+      const hasScheme = /^[a-z][a-z0-9+.-]*:\/\//i.test(text);
+      let url;
+      try {
+        url = new URL(hasScheme ? text : "https://" + text);
+      } catch (e) {
+        return { error: "Eso no parece una dirección web válida." };
+      }
+      if (!["http:", "https:"].includes(url.protocol)) {
+        return { error: "Solo analizo enlaces web (http o https)." };
+      }
+
+      const host = url.hostname.toLowerCase();
+      const findings = [];
+      let score = 0;
+      const add = (level, msg, points) => {
+        findings.push({ level, msg });
+        score += points;
+      };
+
+      // Protocolo
+      if (url.protocol === "https:") add("ok", "Usa HTTPS: la conexión va cifrada (aunque eso no garantiza que el sitio sea honesto).", 0);
+      else add("warn", "No usa HTTPS: los datos viajan sin cifrar.", 1);
+
+      // Dirección IP en lugar de dominio
+      const isIp = /^\d{1,3}(\.\d{1,3}){3}$/.test(host) || host.startsWith("[");
+      if (isIp) add("bad", "Usa una dirección IP en lugar de un nombre de dominio.", 3);
+
+      // Usuario o clave dentro del enlace (truco con @)
+      if (url.username || url.password) add("bad", "Contiene un '@': lo que ves antes puede no ser el destino real.", 3);
+
+      // Punycode (caracteres internacionales que imitan letras)
+      if (host.includes("xn--")) add("bad", "Usa caracteres internacionales que pueden imitar a otro dominio (ataque homógrafo).", 3);
+
+      // Acortadores
+      if (SHORTENERS.some((s) => host === s || host.endsWith("." + s))) {
+        add("warn", "Es un acortador de enlaces: oculta el destino real.", 2);
+      }
+
+      // Extensión de dominio
+      const tld = host.split(".").pop();
+      if (!isIp && RISKY_TLDS.includes(tld)) add("warn", `La terminación .${tld} se usa con frecuencia en estafas.`, 2);
+
+      // Palabras que aparentan seguridad
+      const found = KEYWORDS.filter((k) => host.includes(k));
+      if (!isIp && found.length) {
+        add("warn", `El dominio incluye palabras como "${found.slice(0, 3).join('", "')}", típicas de engaños.`, 2);
+      }
+
+      // Demasiados subdominios o guiones
+      if (!isIp && host.split(".").length > 4) add("warn", "Tiene muchos subdominios: es una forma de camuflar el dominio real.", 1);
+      if ((host.match(/-/g) || []).length >= 3) add("warn", "El dominio tiene muchos guiones, algo poco habitual en sitios legítimos.", 1);
+
+      // Puerto raro y longitud
+      if (url.port && !["80", "443"].includes(url.port)) add("warn", `Usa un puerto poco común (${url.port}).`, 1);
+      if (text.length > 100) add("warn", "El enlace es muy largo, lo que dificulta revisarlo.", 1);
+
+      if (!findings.some((f) => f.level !== "ok")) {
+        add("ok", "No se detectaron señales de alerta evidentes en la estructura del enlace.", 0);
+      }
+
+      const level = findings.some((f) => f.level === "bad") || score >= 3 ? "bad" : score >= 1 ? "warn" : "ok";
+      return { host, domain: isIp ? host : registrable(host), findings, level, score };
+    }
+
+    function render(result) {
+      out.hidden = false;
+      out.textContent = "";
+
+      if (result.error) {
+        out.appendChild(h("p", "note note--error", result.error));
+        return;
+      }
+
+      const LABELS = {
+        ok: ["✔", "Sin señales de alerta"],
+        warn: ["⚠", "Precaución"],
+        bad: ["✖", "Peligro probable"],
+      };
+
+      const head = h("div", `risk risk--${result.level}`);
+      head.append(h("span", "risk__icon", LABELS[result.level][0]));
+      const headText = h("div");
+      headText.append(h("strong", "", LABELS[result.level][1]), h("span", "", `Puntaje de riesgo: ${result.score}`));
+      head.appendChild(headText);
+
+      const domain = h("p", "domainbox");
+      domain.append(h("span", "", "Dominio real: "), h("code", "", result.domain));
+
+      const list = h("ul", "findings");
+      result.findings.forEach((f) => {
+        const li = h("li", `finding finding--${f.level}`, f.msg);
+        list.appendChild(li);
+      });
+
+      out.append(
+        head,
+        domain,
+        list,
+        h("p", "note", "Análisis heurístico y local: no consulta listas de sitios maliciosos. Ante la duda, no abras el enlace y entra al sitio escribiendo su dirección.")
+      );
+    }
+
+    function run() {
+      if (!input.value.trim()) {
+        out.hidden = false;
+        out.textContent = "";
+        out.appendChild(h("p", "note note--error", "Pega primero un enlace para analizarlo."));
+        return;
+      }
+      render(analyze(input.value));
+    }
+
+    $("linkCheck").addEventListener("click", run);
+    input.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") run();
+    });
+    $("linkExample").addEventListener("click", () => {
+      input.value = EXAMPLES[exampleIndex % EXAMPLES.length];
+      exampleIndex++;
+      run();
+    });
+  }
+
+  /* ==========================================================
+     PIN Y FRASES DE CONTRASEÑA
+     ========================================================== */
+  function initPinGenerator() {
+    /* ---- PIN ---- */
+    const pinOut = $("pinOutput");
+    const pinLen = $("pinLength");
+
+    function isWeakPin(p) {
+      if (/^(\d)\1+$/.test(p)) return true; // todos iguales
+      const d = Array.from(p, Number);
+      if (d.every((v, i) => i === 0 || v === d[i - 1] + 1)) return true; // ascendente
+      if (d.every((v, i) => i === 0 || v === d[i - 1] - 1)) return true; // descendente
+      if (p.length % 2 === 0 && p.slice(0, p.length / 2).repeat(2) === p) return true; // 1212
+      return ["2580", "1004", "6969", "2000"].includes(p);
+    }
+
+    function makePin() {
+      const len = Number(pinLen.value);
+      let pin;
+      do {
+        pin = Array.from({ length: len }, () => randInt(10)).join("");
+      } while (isWeakPin(pin));
+      pinOut.value = pin;
+      const combos = Math.pow(10, len).toLocaleString("es-ES");
+      $("pinInfo").textContent = `${combos} combinaciones posibles. Evitamos secuencias y repeticiones obvias. Úsalo solo donde haya bloqueo tras varios intentos fallidos.`;
+    }
+
+    pinLen.addEventListener("change", makePin);
+    $("pinRegen").addEventListener("click", makePin);
+    $("pinCopy").addEventListener("click", () => copyText(pinOut.value));
+
+    /* ---- Frase ---- */
+    const WORDS = [...new Set([
+      "nube", "tigre", "cohete", "piedra", "bosque", "faro", "luna", "trigo", "puente", "delfin",
+      "cafe", "viento", "lluvia", "rio", "monte", "isla", "fuego", "hielo", "sol", "estrella",
+      "camino", "ventana", "jardin", "tormenta", "volcan", "planeta", "cometa", "mapa", "brujula", "tesoro",
+      "castillo", "dragon", "caballo", "halcon", "lobo", "zorro", "oso", "ballena", "pulpo", "tortuga",
+      "abeja", "mariposa", "girasol", "roble", "pino", "cactus", "helecho", "musgo", "arena", "playa",
+      "ola", "coral", "perla", "ancla", "velero", "tren", "bicicleta", "motor", "reloj", "llave",
+      "candado", "escudo", "espada", "flecha", "tambor", "guitarra", "piano", "violin", "pincel", "lienzo",
+      "libro", "pluma", "tinta", "papel", "tijera", "martillo", "tornillo", "engranaje", "circuito", "pixel",
+      "robot", "laser", "cristal", "diamante", "rubi", "jade", "ambar", "canela", "miel", "limon",
+      "naranja", "manzana", "pera", "uva", "mango", "coco", "pimienta", "jengibre", "chocolate", "galleta",
+    ])];
+
+    const words = $("phraseWords");
+    const sep = $("phraseSep");
+    const cap = $("phraseCap");
+    const num = $("phraseNum");
+    const phraseOut = $("phraseOutput");
+
+    function makePhrase() {
+      const n = Number(words.value);
+      $("phraseWordsVal").textContent = n;
+
+      let parts = Array.from({ length: n }, () => WORDS[randInt(WORDS.length)]);
+      if (cap.checked) parts = parts.map((w) => w[0].toUpperCase() + w.slice(1));
+
+      let phrase = parts.join(sep.value);
+      let bits = n * Math.log2(WORDS.length);
+
+      if (num.checked) {
+        phrase += sep.value + String(randInt(100)).padStart(2, "0");
+        bits += Math.log2(100);
+      }
+
+      phraseOut.value = phrase;
+      const secs = Math.pow(2, Math.max(bits - 1, 0)) / 1e10;
+      $("phraseInfo").textContent = `≈ ${Math.round(bits)} bits de entropía con esta lista de ${WORDS.length} palabras · se tardaría ${humanTime(secs)} en descifrarla.`;
+    }
+
+    [words, sep, cap, num].forEach((el) => el.addEventListener("input", makePhrase));
+    $("phraseRegen").addEventListener("click", makePhrase);
+    $("phraseCopy").addEventListener("click", () => copyText(phraseOut.value));
+
+    makePin();
+    makePhrase();
+  }
+
+  /* ==========================================================
+     DETECTOR DE FILTRACIONES (SIMULADO)
+     ========================================================== */
+  function initLeakDetector() {
+    const input = $("leakEmail");
+    const btn = $("leakBtn");
+    const scan = $("leakScan");
+    const scanText = $("leakScanText");
+    const result = $("leakResult");
+    let busy = false;
+
+    const BREACHES = [
+      { name: "MegaTienda", year: 2019, data: ["Correo", "Contraseña (hash)", "Nombre"] },
+      { name: "RedSocialX", year: 2021, data: ["Correo", "Teléfono", "Fecha de nacimiento"] },
+      { name: "AppFitness", year: 2022, data: ["Correo", "Contraseña", "Peso y estatura"] },
+      { name: "JuegosOnlineYa", year: 2020, data: ["Correo", "Usuario", "Dirección IP"] },
+      { name: "NubeNotas", year: 2023, data: ["Correo", "Notas privadas", "Contraseña (hash)"] },
+    ];
+
+    const ADVICE = [
+      "Cambia la contraseña de las cuentas afectadas y de cualquiera donde la hayas repetido.",
+      "Activa la verificación en dos pasos.",
+      "Usa un gestor de contraseñas para tener una clave distinta en cada sitio.",
+      "Desconfía de correos que mencionen datos tuyos: los atacantes los usan para sonar creíbles.",
+    ];
+
+    function showError(msg) {
+      result.hidden = false;
+      result.textContent = "";
+      result.appendChild(h("p", "note note--error", msg));
+    }
+
+    function render(email) {
+      const hash = fnv(email);
+      const roll = hash % 100;
+      result.hidden = false;
+      result.textContent = "";
+
+      if (roll < 30) {
+        const ok = h("div", "risk risk--ok");
+        ok.append(h("span", "risk__icon", "✔"));
+        const t = h("div");
+        t.append(h("strong", "", "Sin coincidencias"), h("span", "", "Tu correo no aparece en las bases ficticias de esta demo."));
+        ok.appendChild(t);
+        result.append(ok, h("p", "note", "Resultado simulado. Revisa también un servicio real y mantén tus buenas prácticas."));
+        return;
+      }
+
+      const count = 1 + ((hash >>> 8) % 3);
+      const first = (hash >>> 4) % BREACHES.length;
+      const found = Array.from({ length: count }, (_, i) => BREACHES[(first + i) % BREACHES.length]);
+
+      const head = h("div", "risk risk--bad");
+      head.append(h("span", "risk__icon", "✖"));
+      const t = h("div");
+      t.append(
+        h("strong", "", `Aparece en ${count} filtración${count === 1 ? "" : "es"} (simulado)`),
+        h("span", "", "Estos datos son ficticios y se generan a partir de tu correo.")
+      );
+      head.appendChild(t);
+      result.appendChild(head);
+
+      const list = h("div", "breaches");
+      found.forEach((b) => {
+        const card = h("article", "breach");
+        const top = h("div", "breach__top");
+        top.append(h("strong", "", b.name), h("span", "breach__year", String(b.year)));
+        const tags = h("div", "breach__tags");
+        b.data.forEach((d) => {
+          const risky = /contraseña/i.test(d);
+          tags.appendChild(h("span", `tag${risky ? " tag--risk" : ""}`, d));
+        });
+        card.append(top, h("p", "breach__label", "Datos expuestos:"), tags);
+        list.appendChild(card);
+      });
+      result.appendChild(list);
+
+      result.appendChild(h("h3", "subtitle", "Qué hacer en un caso real"));
+      const adv = h("ul", "advice");
+      ADVICE.forEach((a) => adv.appendChild(h("li", "", a)));
+      result.appendChild(adv);
+    }
+
+    async function check() {
+      if (busy) return;
+      const email = input.value.trim().toLowerCase();
+      result.hidden = true;
+
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) {
+        showError("Escribe un correo válido, por ejemplo nombre@dominio.com.");
+        return;
+      }
+
+      busy = true;
+      btn.disabled = true;
+      scan.hidden = false;
+
+      const steps = ["Conectando con bases ficticias...", "Comparando huellas del correo...", "Analizando resultados..."];
+      for (const step of steps) {
+        scanText.textContent = step;
+        await sleep(reduceMotion ? 0 : 600);
+      }
+
+      scan.hidden = true;
+      busy = false;
+      btn.disabled = false;
+      render(email);
+    }
+
+    btn.addEventListener("click", check);
+    input.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") check();
+    });
+  }
+
+  /* ==========================================================
+     GLOSARIO
+     ========================================================== */
+  function initGlossary() {
+    const TERMS = [
+      ["Phishing", "Mensajes falsos que imitan a una empresa o persona de confianza para que entregues contraseñas o datos."],
+      ["Malware", "Cualquier programa diseñado para dañar, espiar o tomar control de un dispositivo."],
+      ["Ransomware", "Malware que cifra tus archivos y exige un pago para devolverlos."],
+      ["Spyware", "Software que espía lo que haces y envía esa información a un tercero."],
+      ["Troyano", "Programa que parece legítimo pero oculta funciones maliciosas."],
+      ["Virus", "Código malicioso que se copia a sí mismo al abrir archivos infectados."],
+      ["Gusano", "Malware que se propaga solo por redes sin que nadie lo ejecute."],
+      ["Botnet", "Red de dispositivos infectados controlados a distancia para lanzar ataques."],
+      ["Firewall", "Cortafuegos: filtra el tráfico de red permitiendo o bloqueando conexiones según reglas."],
+      ["VPN", "Red privada virtual: cifra tu conexión y oculta tu dirección real, útil en redes públicas."],
+      ["2FA / MFA", "Verificación en dos o más pasos: además de la contraseña, pide un código o dispositivo."],
+      ["Cifrado", "Proceso que convierte la información en un código ilegible sin la clave correcta."],
+      ["Hash", "Huella digital de un dato: siempre da el mismo resultado y no se puede revertir fácilmente."],
+      ["Salt", "Dato aleatorio que se añade a una contraseña antes de aplicar el hash para dificultar ataques."],
+      ["Vulnerabilidad", "Fallo en un sistema o programa que puede ser aprovechado por un atacante."],
+      ["Exploit", "Técnica o código que aprovecha una vulnerabilidad."],
+      ["Zero-day", "Vulnerabilidad desconocida para el fabricante, sin parche disponible todavía."],
+      ["Parche", "Actualización que corrige una vulnerabilidad o un error."],
+      ["Ingeniería social", "Manipulación psicológica para que una persona revele información o realice una acción."],
+      ["DDoS", "Ataque que satura un servicio con tráfico masivo para dejarlo fuera de línea."],
+      ["Keylogger", "Programa o dispositivo que registra lo que escribes en el teclado."],
+      ["Inyección SQL", "Ataque web que introduce instrucciones en un formulario para manipular la base de datos."],
+      ["XSS", "Cross-site scripting: inserción de scripts maliciosos en páginas que otros usuarios visitan."],
+      ["Man-in-the-middle", "Atacante que se coloca entre dos partes para espiar o alterar su comunicación."],
+      ["Pentesting", "Prueba de penetración: simulación autorizada de ataques para encontrar fallos antes que un delincuente."],
+      ["Hacker ético", "Profesional que busca vulnerabilidades con permiso para ayudar a corregirlas."],
+      ["Honeypot", "Sistema señuelo que atrae atacantes para estudiar sus métodos."],
+      ["Backdoor", "Puerta trasera: acceso oculto que evita los controles normales de seguridad."],
+      ["HTTPS / TLS", "Protocolo que cifra la comunicación entre tu navegador y un sitio web."],
+      ["Gestor de contraseñas", "Aplicación que guarda y genera claves únicas, protegidas por una sola contraseña maestra."],
+    ].sort((a, b) => a[0].localeCompare(b[0], "es"));
+
+    const list = $("glossList");
+    const search = $("glossSearch");
+
+    function render() {
+      const q = plain(search.value.trim());
+      const shown = TERMS.filter(([t, d]) => !q || plain(t).includes(q) || plain(d).includes(q));
+
+      list.textContent = "";
+      shown.forEach(([term, def]) => {
+        const item = h("details", "gloss__item");
+        item.appendChild(h("summary", "gloss__term", term));
+        item.appendChild(h("p", "gloss__def", def));
+        list.appendChild(item);
+      });
+
+      $("glossCount").textContent = `${shown.length} de ${TERMS.length} términos`;
+      $("glossEmpty").hidden = shown.length > 0;
+    }
+
+    search.addEventListener("input", render);
+    render();
+  }
+
+  /* ==========================================================
+     TIPOS DE ATAQUES
+     ========================================================== */
+  function initAttacks() {
+    const ATTACKS = [
+      {
+        icon: "🎣", name: "Phishing", target: "personas", risk: 3,
+        what: "El atacante envía correos, SMS o mensajes que imitan a un banco, una tienda o un compañero para que entregues datos o hagas clic en un enlace falso.",
+        defend: "Revisa el remitente y el dominio, desconfía de la urgencia, no abras adjuntos inesperados y entra a los sitios escribiendo tú la dirección.",
+      },
+      {
+        icon: "🔒", name: "Ransomware", target: "personas", risk: 3,
+        what: "Un programa cifra tus archivos y pide dinero a cambio de la clave. Suele entrar por adjuntos o descargas infectadas.",
+        defend: "Haz copias de seguridad desconectadas del equipo, mantén todo actualizado y no ejecutes archivos de origen dudoso.",
+      },
+      {
+        icon: "🧠", name: "Ingeniería social", target: "personas", risk: 3,
+        what: "En lugar de atacar un sistema, se engaña a una persona con mentiras, presión o falsa autoridad para que ceda acceso.",
+        defend: "Verifica la identidad por otro canal, no compartas claves con nadie y toma tu tiempo ante cualquier petición urgente.",
+      },
+      {
+        icon: "🔑", name: "Fuerza bruta y credential stuffing", target: "personas", risk: 2,
+        what: "Se prueban miles de contraseñas, o claves filtradas de otros sitios, hasta acertar con una cuenta.",
+        defend: "Usa una clave única y larga por cuenta, activa la verificación en dos pasos y limita los intentos fallidos.",
+      },
+      {
+        icon: "🕵️", name: "Spyware y keyloggers", target: "personas", risk: 2,
+        what: "Programas ocultos que registran lo que escribes, ven tu pantalla o recopilan tus datos sin que lo notes.",
+        defend: "Instala apps solo de fuentes oficiales, usa protección antimalware y revisa los permisos de tus aplicaciones.",
+      },
+      {
+        icon: "💉", name: "Inyección SQL", target: "webs", risk: 3,
+        what: "Un formulario web mal protegido deja que alguien introduzca instrucciones que la base de datos obedece, exponiendo o alterando información.",
+        defend: "Usa consultas parametrizadas, valida y limpia toda entrada y da a la aplicación solo los permisos mínimos.",
+      },
+      {
+        icon: "📜", name: "XSS (Cross-Site Scripting)", target: "webs", risk: 2,
+        what: "Se logra que una página muestre código malicioso que luego se ejecuta en el navegador de otros visitantes.",
+        defend: "Escapa siempre lo que se muestra, aplica una política CSP y nunca confíes en datos enviados por el usuario.",
+      },
+      {
+        icon: "🌊", name: "DDoS", target: "redes", risk: 2,
+        what: "Miles de dispositivos envían peticiones al mismo tiempo hasta saturar un servicio y dejarlo inaccesible.",
+        defend: "Usa servicios de mitigación y CDN, limita la tasa de peticiones y ten capacidad de respuesta preparada.",
+      },
+      {
+        icon: "📡", name: "Man-in-the-middle", target: "redes", risk: 2,
+        what: "El atacante se interpone entre tú y un sitio, por ejemplo en una wifi pública, para leer o modificar lo que se envía.",
+        defend: "Comprueba que la web use HTTPS, evita redes públicas para tareas sensibles y usa una VPN de confianza.",
+      },
+    ];
+
+    const RISK = { 1: "Bajo", 2: "Alto", 3: "Crítico" };
+    const list = $("attackList");
+    let target = "todos";
+
+    function render() {
+      list.textContent = "";
+      ATTACKS.filter((a) => target === "todos" || a.target === target).forEach((a) => {
+        const card = h("details", "atk");
+
+        const sum = h("summary", "atk__head");
+        sum.append(h("span", "atk__icon", a.icon));
+        const title = h("span", "atk__title");
+        title.append(h("strong", "", a.name), h("small", "", `Objetivo: ${a.target}`));
+        sum.appendChild(title);
+        sum.appendChild(h("span", `atk__risk atk__risk--${a.risk}`, `Riesgo ${RISK[a.risk]}`));
+        card.appendChild(sum);
+
+        const body = h("div", "atk__body");
+        body.append(
+          h("h4", "", "Cómo funciona"),
+          h("p", "", a.what),
+          h("h4", "atk__defend", "Cómo defenderte"),
+          h("p", "", a.defend)
+        );
+        card.appendChild(body);
+        list.appendChild(card);
+      });
+    }
+
+    document.querySelectorAll("[data-target]").forEach((chip) => {
+      chip.addEventListener("click", () => {
+        target = chip.dataset.target;
+        document.querySelectorAll("[data-target]").forEach((c) => c.classList.toggle("is-active", c === chip));
+        render();
+      });
+    });
+
+    render();
+  }
+
+  /* ==========================================================
+     GUÍA DE BUENAS PRÁCTICAS (checklist con progreso)
+     ========================================================== */
+  function initChecklist() {
+    const KEY = "cibershield-checklist";
+    const GROUPS = [
+      ["🔑 Cuentas", [
+        ["pass-unique", "Uso una contraseña distinta en cada cuenta"],
+        ["pass-manager", "Guardo mis claves en un gestor de contraseñas"],
+        ["twofa", "Tengo verificación en dos pasos en mi correo y mi banco"],
+        ["sessions", "Reviso de vez en cuando las sesiones abiertas en mis cuentas"],
+      ]],
+      ["📱 Dispositivos", [
+        ["updates", "Mantengo actualizado el sistema y mis aplicaciones"],
+        ["lock", "Mi teléfono y mi computador tienen bloqueo de pantalla"],
+        ["malware", "Tengo protección antimalware activa"],
+        ["encrypt", "Mi disco o teléfono está cifrado"],
+      ]],
+      ["🌐 Navegación", [
+        ["https", "Compruebo el candado y el dominio antes de dar datos"],
+        ["links", "No hago clic en enlaces de mensajes inesperados"],
+        ["downloads", "Descargo programas solo de sitios oficiales"],
+      ]],
+      ["📶 Red", [
+        ["router", "Cambié la contraseña por defecto de mi router"],
+        ["publicwifi", "Evito la wifi pública para banca y cuentas importantes"],
+      ]],
+      ["💾 Datos", [
+        ["backup", "Hago copias de seguridad de lo importante (regla 3-2-1)"],
+        ["permissions", "Reviso los permisos que piden mis aplicaciones"],
+      ]],
+    ];
+
+    const total = GROUPS.reduce((n, g) => n + g[1].length, 0);
+    let state = {};
+    try {
+      state = JSON.parse(storageGet(KEY) || "{}") || {};
+    } catch (e) {
+      state = {};
+    }
+
+    const listEl = $("bestList");
+
+    function updateScore() {
+      const done = GROUPS.flatMap((g) => g[1]).filter(([id]) => state[id]).length;
+      const pct = Math.round((done / total) * 100);
+
+      $("bestPct").textContent = `${pct}%`;
+      $("bestRing").style.setProperty("--p", pct);
+      $("bestCount").textContent = `${done} de ${total} hábitos`;
+
+      let label = "Principiante";
+      if (pct >= 90) label = "Blindado 🛡️";
+      else if (pct >= 60) label = "Protegido";
+      else if (pct >= 25) label = "En camino";
+      $("bestLabel").textContent = label;
+    }
+
+    GROUPS.forEach(([title, items]) => {
+      const group = h("div", "bp");
+      group.appendChild(h("h3", "subtitle", title));
+      const ul = h("ul", "bp__list");
+
+      items.forEach(([id, text]) => {
+        const li = h("li");
+        const label = h("label", "check");
+        const box = document.createElement("input");
+        box.type = "checkbox";
+        box.checked = Boolean(state[id]);
+        box.addEventListener("change", () => {
+          state[id] = box.checked;
+          storageSet(KEY, JSON.stringify(state));
+          updateScore();
+        });
+        label.append(box, h("span", "", text));
+        li.appendChild(label);
+        ul.appendChild(li);
+      });
+
+      group.appendChild(ul);
+      listEl.appendChild(group);
+    });
+
+    $("bestReset").addEventListener("click", () => {
+      state = {};
+      storageSet(KEY, "{}");
+      listEl.querySelectorAll("input[type=checkbox]").forEach((b) => (b.checked = false));
+      updateScore();
+      toast("Progreso reiniciado");
+    });
+
+    updateScore();
+  }
+
+  /* ==========================================================
      10. INICIO
      ========================================================== */
+  initTheme();
   initTabs();
   initPasswordAnalyzer();
   initGenerator();
+  initPinGenerator();
   initHash();
   initEncoder();
+  initLinkChecker();
+  initLeakDetector();
   initQuiz();
   initTerminal();
+  initGlossary();
+  initAttacks();
+  initChecklist();
+  initEffects();
   startClock();
   showTip();
   $("tipBtn").addEventListener("click", showTip);
 
-  runIntro(startRain);
+  // El texto del hero se escribe solo cuando termina la intro
+  if (!reduceMotion) $("typeTag").textContent = "";
+
+  runIntro(() => {
+    startRain();
+    typeTag();
+    countUp();
+  });
 })();
