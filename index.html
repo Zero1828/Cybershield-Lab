@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CiberShield Lab | Herramientas de Ciberseguridad</title>
+  <meta name="description" content="Laboratorio de ciberseguridad: analizador de contraseñas, generador, hashes, codificador, quiz de phishing y terminal simulada.">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body class="is-intro">
+
+  <!-- ========== INTRO: CÓDIGO BINARIO ========== -->
+  <div class="intro" id="intro" role="dialog" aria-label="Pantalla de inicio">
+    <canvas class="intro__canvas" id="introCanvas" aria-hidden="true"></canvas>
+    <div class="intro__box">
+      <p class="intro__line" id="introLine">&gt; Iniciando CiberShield...</p>
+      <div class="intro__bar"><div class="intro__fill" id="introFill"></div></div>
+    </div>
+    <button class="intro__skip" id="introSkip" type="button">Saltar ▸</button>
+  </div>
+
+  <!-- Fondo de lluvia binaria -->
+  <canvas class="rain" id="rain" aria-hidden="true"></canvas>
+
+  <div class="app">
+
+    <!-- ========== HEADER ========== -->
+    <header class="topbar">
+      <a class="logo" href="#inicio" aria-label="CiberShield Lab">
+        <svg class="logo__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+          <polyline points="9 12 11 14 15 10"/>
+        </svg>
+        <span>CiberShield <b>Lab</b></span>
+      </a>
+
+      <div class="status">
+        <span class="status__dot" aria-hidden="true"></span>
+        <span class="status__text">Sistema protegido</span>
+        <span class="status__clock" id="clock" aria-label="Hora actual">00:00:00</span>
+      </div>
+    </header>
+
+    <main id="inicio">
+
+      <!-- ========== HERO ========== -->
+      <section class="hero">
+        <p class="hero__tag">&gt; laboratorio_seguridad.exe</p>
+        <h1 class="hero__title">Aprende a defenderte <span class="grad">como un profesional</span>.</h1>
+        <p class="hero__lead">
+          Seis herramientas interactivas para analizar contraseñas, generar claves seguras, calcular hashes, codificar mensajes y entrenar tu ojo contra el phishing.
+        </p>
+
+        <ul class="hero__stats">
+          <li><strong>6</strong> herramientas</li>
+          <li><strong>100%</strong> local en tu navegador</li>
+          <li><strong>0</strong> datos enviados</li>
+        </ul>
+
+        <div class="tip">
+          <span class="tip__label">TIP</span>
+          <p class="tip__text" id="tipText"></p>
+          <button class="tip__btn" id="tipBtn" type="button" aria-label="Mostrar otro consejo">↻</button>
+        </div>
+      </section>
+
+      <!-- ========== PESTAÑAS ========== -->
+      <div class="tabs" role="tablist" aria-label="Herramientas de ciberseguridad">
+        <button class="tab is-active" role="tab" id="tab-pass" aria-controls="panel-pass" aria-selected="true" data-tab="pass">🔑 Contraseña</button>
+        <button class="tab" role="tab" id="tab-gen" aria-controls="panel-gen" aria-selected="false" tabindex="-1" data-tab="gen">⚙️ Generador</button>
+        <button class="tab" role="tab" id="tab-hash" aria-controls="panel-hash" aria-selected="false" tabindex="-1" data-tab="hash">#️⃣ Hash</button>
+        <button class="tab" role="tab" id="tab-enc" aria-controls="panel-enc" aria-selected="false" tabindex="-1" data-tab="enc">🔐 Codificador</button>
+        <button class="tab" role="tab" id="tab-quiz" aria-controls="panel-quiz" aria-selected="false" tabindex="-1" data-tab="quiz">🎣 Phishing</button>
+        <button class="tab" role="tab" id="tab-term" aria-controls="panel-term" aria-selected="false" tabindex="-1" data-tab="term">💻 Terminal</button>
+      </div>
+
+      <!-- ========== PANEL: ANALIZADOR ========== -->
+      <section class="panel" role="tabpanel" id="panel-pass" aria-labelledby="tab-pass">
+        <h2 class="panel__title">Analizador de contraseñas</h2>
+        <p class="panel__hint">Escribe una contraseña para medir su fortaleza. Nada sale de tu dispositivo.</p>
+
+        <div class="field">
+          <label for="passInput">Contraseña a analizar</label>
+          <div class="field__row">
+            <input class="input input--mono" id="passInput" type="password" autocomplete="off" spellcheck="false" placeholder="Escribe aquí...">
+            <button class="btn btn--ghost" id="passToggle" type="button" aria-pressed="false">Mostrar</button>
+          </div>
+        </div>
+
+        <div class="meter" id="passMeter" data-level="-1" role="progressbar" aria-label="Fortaleza de la contraseña" aria-valuemin="0" aria-valuemax="4" aria-valuenow="0">
+          <div class="meter__fill"></div>
+        </div>
+        <p class="meter__label">Nivel: <strong id="passLevel">—</strong></p>
+
+        <div class="metrics">
+          <div class="metric">
+            <span class="metric__label">Entropía</span>
+            <span class="metric__value" id="passBits">0 bits</span>
+          </div>
+          <div class="metric">
+            <span class="metric__label">Tiempo estimado para descifrarla</span>
+            <span class="metric__value" id="passTime">—</span>
+          </div>
+        </div>
+
+        <ul class="checks" id="passChecks">
+          <li data-check="len">Al menos 12 caracteres</li>
+          <li data-check="lower">Contiene minúsculas</li>
+          <li data-check="upper">Contiene mayúsculas</li>
+          <li data-check="num">Contiene números</li>
+          <li data-check="sym">Contiene símbolos</li>
+          <li data-check="common">No es una contraseña común</li>
+          <li data-check="pattern">Sin repeticiones ni secuencias obvias</li>
+        </ul>
+      </section>
+
+      <!-- ========== PANEL: GENERADOR ========== -->
+      <section class="panel" role="tabpanel" id="panel-gen" aria-labelledby="tab-gen" hidden>
+        <h2 class="panel__title">Generador de contraseñas</h2>
+        <p class="panel__hint">Usa el generador criptográfico del navegador, no números predecibles.</p>
+
+        <div class="field">
+          <label for="genOutput">Contraseña generada</label>
+          <div class="field__row">
+            <input class="input input--mono input--big" id="genOutput" type="text" readonly>
+            <button class="btn" id="genCopy" type="button">Copiar</button>
+          </div>
+        </div>
+
+        <div class="meter" id="genMeter" data-level="-1" role="progressbar" aria-label="Fortaleza de la contraseña generada" aria-valuemin="0" aria-valuemax="4" aria-valuenow="0">
+          <div class="meter__fill"></div>
+        </div>
+        <p class="meter__label">Nivel: <strong id="genLevel">—</strong></p>
+
+        <div class="field">
+          <label for="genLength">Longitud: <strong id="genLengthVal">16</strong> caracteres</label>
+          <input class="range" id="genLength" type="range" min="8" max="64" value="16">
+        </div>
+
+        <div class="options">
+          <label class="check"><input type="checkbox" id="genUpper" checked><span>Mayúsculas (A-Z)</span></label>
+          <label class="check"><input type="checkbox" id="genLower" checked><span>Minúsculas (a-z)</span></label>
+          <label class="check"><input type="checkbox" id="genNum" checked><span>Números (0-9)</span></label>
+          <label class="check"><input type="checkbox" id="genSym" checked><span>Símbolos (!@#$)</span></label>
+          <label class="check"><input type="checkbox" id="genAmbig"><span>Evitar caracteres confusos (0 O l 1 I)</span></label>
+        </div>
+        <p class="note" id="genMsg" role="status"></p>
+
+        <button class="btn btn--full" id="genRegen" type="button">Generar otra</button>
+      </section>
+
+      <!-- ========== PANEL: HASH ========== -->
+      <section class="panel" role="tabpanel" id="panel-hash" aria-labelledby="tab-hash" hidden>
+        <h2 class="panel__title">Calculadora de hashes</h2>
+        <p class="panel__hint">Un hash es la huella digital de un texto: cambia una letra y cambia todo.</p>
+
+        <div class="field">
+          <label for="hashInput">Texto de entrada</label>
+          <textarea class="input input--mono" id="hashInput" rows="3" placeholder="Escribe o pega un texto..."></textarea>
+        </div>
+
+        <div class="hashes">
+          <div class="hash">
+            <div class="hash__head"><span>SHA-1</span><button class="mini-btn" type="button" data-copy="hash-sha1">Copiar</button></div>
+            <code class="hash__value" id="hash-sha1"></code>
+          </div>
+          <div class="hash">
+            <div class="hash__head"><span>SHA-256</span><button class="mini-btn" type="button" data-copy="hash-sha256">Copiar</button></div>
+            <code class="hash__value" id="hash-sha256"></code>
+          </div>
+          <div class="hash">
+            <div class="hash__head"><span>SHA-512</span><button class="mini-btn" type="button" data-copy="hash-sha512">Copiar</button></div>
+            <code class="hash__value" id="hash-sha512"></code>
+          </div>
+        </div>
+
+        <div class="field">
+          <label for="hashVerify">Verificar integridad: pega un hash para compararlo</label>
+          <input class="input input--mono" id="hashVerify" type="text" autocomplete="off" spellcheck="false" placeholder="Hash esperado...">
+          <p class="note" id="hashVerifyResult" role="status"></p>
+        </div>
+      </section>
+
+      <!-- ========== PANEL: CODIFICADOR ========== -->
+      <section class="panel" role="tabpanel" id="panel-enc" aria-labelledby="tab-enc" hidden>
+        <h2 class="panel__title">Codificador y decodificador</h2>
+        <p class="panel__hint">Convierte mensajes a binario, hexadecimal, Base64 o cifrado César. Recuerda: codificar no es lo mismo que cifrar con seguridad.</p>
+
+        <div class="field">
+          <label for="encInput">Mensaje</label>
+          <textarea class="input input--mono" id="encInput" rows="3" placeholder="Hola mundo"></textarea>
+        </div>
+
+        <div class="enc-controls">
+          <div class="field">
+            <label for="encMode">Formato</label>
+            <select class="input" id="encMode">
+              <option value="bin">Binario</option>
+              <option value="hex">Hexadecimal</option>
+              <option value="b64">Base64</option>
+              <option value="caesar">Cifrado César</option>
+            </select>
+          </div>
+          <div class="field" id="encShiftWrap" hidden>
+            <label for="encShift">Desplazamiento: <strong id="encShiftVal">3</strong></label>
+            <input class="range" id="encShift" type="range" min="1" max="25" value="3">
+          </div>
+        </div>
+
+        <div class="btn-row">
+          <button class="btn" id="encEncode" type="button">Codificar</button>
+          <button class="btn btn--ghost" id="encDecode" type="button">Decodificar</button>
+        </div>
+
+        <p class="note note--error" id="encError" role="alert"></p>
+
+        <div class="field">
+          <label for="encOutput">Resultado</label>
+          <textarea class="input input--mono" id="encOutput" rows="3" readonly></textarea>
+        </div>
+
+        <div class="btn-row">
+          <button class="btn btn--ghost" id="encCopy" type="button">Copiar resultado</button>
+          <button class="btn btn--ghost" id="encSwap" type="button">Usar como entrada ⇅</button>
+        </div>
+      </section>
+
+      <!-- ========== PANEL: QUIZ PHISHING ========== -->
+      <section class="panel" role="tabpanel" id="panel-quiz" aria-labelledby="tab-quiz" hidden>
+        <h2 class="panel__title">Detecta el phishing</h2>
+        <p class="panel__hint">Lee cada mensaje y decide: ¿es legítimo o es una trampa?</p>
+
+        <div id="quizBox">
+          <div class="quiz__top">
+            <span id="quizProgress">Pregunta 1 de 7</span>
+            <span id="quizScore">Aciertos: 0</span>
+          </div>
+          <div class="meter meter--thin"><div class="meter__fill meter__fill--static" id="quizFill"></div></div>
+
+          <article class="mail" aria-live="polite">
+            <p class="mail__row"><span>De:</span> <b id="quizFrom"></b></p>
+            <p class="mail__row"><span>Asunto:</span> <b id="quizSubject"></b></p>
+            <p class="mail__body" id="quizBody"></p>
+          </article>
+
+          <div class="btn-row quiz__actions" id="quizActions">
+            <button class="btn btn--safe" type="button" data-answer="legit">✔ Es legítimo</button>
+            <button class="btn btn--danger" type="button" data-answer="phish">⚠ Es phishing</button>
+          </div>
+
+          <p class="feedback" id="quizFeedback" role="status" hidden></p>
+          <button class="btn btn--full" id="quizNext" type="button" hidden>Siguiente</button>
+        </div>
+
+        <div class="result" id="quizResult" hidden>
+          <p class="result__score" id="quizFinal"></p>
+          <p class="result__rank" id="quizRank"></p>
+          <button class="btn btn--full" id="quizRestart" type="button">Jugar de nuevo</button>
+        </div>
+      </section>
+
+      <!-- ========== PANEL: TERMINAL ========== -->
+      <section class="panel" role="tabpanel" id="panel-term" aria-labelledby="tab-term" hidden>
+        <h2 class="panel__title">Terminal simulada</h2>
+        <p class="panel__hint">Entorno educativo. Los comandos son una simulación y no se conectan a ningún sitio real. Escribe <code>ayuda</code> para empezar.</p>
+
+        <div class="term" id="term">
+          <div class="term__bar">
+            <span class="term__dot"></span><span class="term__dot"></span><span class="term__dot"></span>
+            <span class="term__title">guest@cibershield: ~</span>
+          </div>
+          <div class="term__out" id="termOut" aria-live="polite"></div>
+          <form class="term__form" id="termForm" autocomplete="off">
+            <label class="term__prompt" for="termInput">guest@cibershield:~$</label>
+            <input class="term__input" id="termInput" type="text" spellcheck="false" autocapitalize="off" autocomplete="off">
+          </form>
+        </div>
+      </section>
+
+    </main>
+
+    <footer class="footer">
+      <p>CiberShield Lab · Proyecto educativo. Todo se procesa en tu navegador y no se guarda ningún dato.</p>
+    </footer>
+  </div>
+
+  <div class="toasts" id="toasts" aria-live="polite"></div>
+
+  <script src="script.js"></script>
+</body>
+</html>
